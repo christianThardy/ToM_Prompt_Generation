@@ -1,5 +1,3 @@
-# For this section, consider hosting it on github and then downloading to abstract it away
-
 import copy
 import random
 import warnings
