@@ -617,32 +617,30 @@ def get_object_idxs(prompts, tokenizer):
 
 def get_end_idxs(toks, tokenizer, name_tok_len=1, prepend_bos=False):
     relevant_idx = int(prepend_bos)
-    # if the sentence begins with an end token
-    # AND the model pads at the end with the same end token,
-    # then we need to make special arrangements
-
     pad_token_id = tokenizer.pad_token_id
 
     end_idxs_raw = []
     for i in range(toks.shape[0]):
-        if pad_token_id not in toks[i][1:]:
-            end_idxs_raw.append(toks.shape[1])
-            continue
-        nonzers = (toks[i] == pad_token_id).nonzero()[relevant_idx][0].item()
-        end_idxs_raw.append(nonzers)
+        seq = toks[i]
+        # Search for pad token only in tokens starting at index 1 to avoid the BOS token.
+        pad_positions = (seq[1:] == pad_token_id).nonzero()
+        if pad_positions.numel() == 0:
+            end_idx = seq.shape[0]
+        else:
+            # Add 1 to account for the fact that we searched in seq[1:]
+            end_idx = pad_positions[0].item() + 1
+        end_idxs_raw.append(end_idx)
     end_idxs = t.tensor(end_idxs_raw)
     end_idxs = end_idxs - 1 - name_tok_len
 
     for i in range(toks.shape[0]):
-        assert toks[i][end_idxs[i] + 1] != 0 and (
-            toks.shape[1] == end_idxs[i] + 2 or toks[i][end_idxs[i] + 2] == pad_token_id
-        ), (
-            toks[i],
-            end_idxs[i],
-            toks[i].shape,
-            "the END idxs aren't properly formatted",
-        )
-
+        seq = toks[i]
+        idx = end_idxs[i].item()
+        # Check that the token immediately after the computed index is not zero,
+        # and that either the sequence ends right after or the following token is the pad token.
+        assert seq[idx + 1] != 0 and (
+            toks.shape[1] == idx + 2 or seq[idx + 2] == pad_token_id
+        ), (seq, end_idxs[i], seq.shape, "the END idxs aren't properly formatted")
     return end_idxs
 
 
